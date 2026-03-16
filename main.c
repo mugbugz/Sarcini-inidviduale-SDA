@@ -1,260 +1,187 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <time.h>
+#include <stdint.h>
 
-#define MAX 6000
-
-
-typedef struct {
-    int zi, luna, an;
-    char nume[50];
-    char categorie[50];
-    char subcategorie[50];
-    char tara[50];
-    char oras[50];
-    double pret;
-    int cantitate;
-    double venit;
-} Vanzare;
-
-
-
-typedef struct {
-    int luna;
-    double venit;
-} VenitLunar;
-
-typedef struct {
-    char nume[50];
-    double venit;
-} Produs;
-
-typedef struct {
-    char tara[50];
-    char oras[50];
-    double venit;
-} TaraOras;
-
-typedef struct {
-    char tara[50];
-    char oras[50];
-    double venitMax;
-} TopTara;
-
-int citesteCSV(const char *filename, Vanzare v[], int max_rows) {
-    FILE *f = fopen(filename, "r");
-    if (!f) {
-        printf("Eroare la deschiderea fisierului: %s\n", filename);
-        return 0;
+// Inițializare tablou cu valori aleatorii
+int* initArray(int n) {
+    int* arr = (int*)malloc(n * sizeof(int));
+    for(int i = 0; i < n; i++) {
+        arr[i] = rand() % 1000;
     }
-
-    char linie[1024];
-    int n = 0;
-
-    // sari peste header
-    if (!fgets(linie, sizeof(linie), f)) {
-        fclose(f);
-        return 0;
-    }
-
-    while (fgets(linie, sizeof(linie), f)) {
-        // ignora linii goale
-        if (linie[0] == '\n' || linie[0] == '\r' || linie[0] == '\0')
-            continue;
-
-        // daca CSV-ul foloseste ';' in loc de ',' -> convertim rapid
-        for (char *p = linie; *p; p++) {
-            if (*p == ';') *p = ',';
-        }
-
-        if (n >= max_rows) {
-            printf("ATENTIE: S-au depasit %d randuri. Mareste MAX.\n", max_rows);
-            break;
-        }
-
-        // initializeaza sigur (evita gunoi daca parse-ul esueaza)
-        memset(&v[n], 0, sizeof(Vanzare));
-
-        int scanned = sscanf(linie,
-    "%d-%d-%d,%*d,%49[^,],%49[^,],%49[^,],%lf,%d,%49[^,],%49[^\r\n]",
-    &v[n].an, &v[n].luna, &v[n].zi,
-    v[n].nume,
-    v[n].categorie,
-    v[n].subcategorie,
-    &v[n].pret,
-    &v[n].cantitate,
-    v[n].tara,
-    v[n].oras
-);
-
-        if (scanned != 10) {
-            // Afiseaza linia problematica (SUPER util)
-            printf("Linie invalida (scanned=%d): %s\n", scanned, linie);
-            continue; // sari peste linia stricata
-        }
-
-        v[n].venit = v[n].pret * v[n].cantitate;
-        n++;
-    }
-
-    fclose(f);
-    return n;
+    return arr;
 }
 
-
-void venitPeLuni(Vanzare v[], int n) {
-    double luni[13] = {0};
-
-    for (int i = 0; i < n; i++)
-        luni[v[i].luna] += v[i].venit;
-
-    printf("\nVenit lunar:\n");
-    for (int i = 1; i <= 12; i++)
-        printf("Luna %d: %.2f\n", i, luni[i]);
+// Afișare tablou
+void printArray(int* arr, int n) {
+    for(int i = 0; i < n; i++) {
+        printf("%d ", arr[i]);
+    }
+    printf("\n");
 }
 
-void top5Produse(Vanzare v[], int n) {
-    Produs p[MAX];
-    int m = 0;
-
-    for (int i = 0; i < n; i++) {
-        int gasit = 0;
-        for (int j = 0; j < m; j++) {
-            if (strcmp(p[j].nume, v[i].nume) == 0) {
-                p[j].venit += v[i].venit;
-                gasit = 1;
-                break;
-            }
-        }
-        if (!gasit) {
-            strcpy(p[m].nume, v[i].nume);
-            p[m].venit = v[i].venit;
-            m++;
-        }
-    }
-
-    // sortare descrescatoare
-    for (int i = 0; i < m - 1; i++)
-        for (int j = i + 1; j < m; j++)
-            if (p[i].venit < p[j].venit) {
-                Produs aux = p[i];
-                p[i] = p[j];
-                p[j] = aux;
-            }
-
-    printf("\nTop 5 produse:\n");
-    for (int i = 0; i < 5 && i < m; i++)
-        printf("%s - %.2f\n", p[i].nume, p[i].venit);
+// Eliberare memorie
+void freeArray(int* arr) {
+    free(arr);
 }
 
-void vanzariPeCategorii(Vanzare v[], int n) {
-    Produs c[MAX];
-    int m = 0;
-
-    for (int i = 0; i < n; i++) {
-        int gasit = 0;
-        for (int j = 0; j < m; j++) {
-            if (strcmp(c[j].nume, v[i].categorie) == 0) {
-                c[j].venit += v[i].venit;
-                gasit = 1;
-                break;
+// Bubble Sort
+void bubbleSort(int* arr, int n) {
+    clock_t start = clock();
+    for(int i = 0; i < n-1; i++) {
+        for(int j = 0; j < n-i-1; j++) {
+            if(arr[j] > arr[j+1]) {
+                int temp = arr[j];
+                arr[j] = arr[j+1];
+                arr[j+1] = temp;
             }
         }
-        if (!gasit) {
-            strcpy(c[m].nume, v[i].categorie);
-            c[m].venit = v[i].venit;
-            m++;
-        }
     }
-
-    printf("\nVanzari pe categorii:\n");
-    for (int i = 0; i < m; i++)
-        printf("%s: %.2f\n", c[i].nume, c[i].venit);
+    clock_t end = clock();
+    printf("Bubble Sort executat în %.5f secunde\n", (double)(end-start)/CLOCKS_PER_SEC);
 }
 
-void topOrasePeTara(Vanzare v[], int n) {
-    // Alocre dinamica
-    TaraOras *tc = (TaraOras*)malloc(sizeof(TaraOras) * (size_t)n);
-    TopTara  *top = (TopTara*)malloc(sizeof(TopTara) * (size_t)n);
-
-    if (!tc || !top) {
-        printf("Eroare: nu s-a putut aloca memorie.\n");
-        free(tc);
-        free(top);
-        return;
-    }
-
-    int m = 0;
-
-    // 1) Agregare venit pe (tara, oras)
-    for (int i = 0; i < n; i++) {
-        int gasit = 0;
-        for (int j = 0; j < m; j++) {
-            if (strcmp(tc[j].tara, v[i].tara) == 0 && strcmp(tc[j].oras, v[i].oras) == 0) {
-                tc[j].venit += v[i].venit;
-                gasit = 1;
-                break;
-            }
-        }
-        if (!gasit) {
-            strcpy(tc[m].tara, v[i].tara);
-            strcpy(tc[m].oras, v[i].oras);
-            tc[m].venit = v[i].venit;
-            m++;
+// Quick Sort
+int partition(int* arr, int low, int high) {
+    int pivot = arr[high];
+    int i = low - 1;
+    for(int j = low; j < high; j++) {
+        if(arr[j] < pivot) {
+            i++;
+            int temp = arr[i]; arr[i] = arr[j]; arr[j] = temp;
         }
     }
-
-    // 2) Top oras per tara
-    int k = 0;
-    for (int i = 0; i < m; i++) {
-        int idx = -1;
-        for (int j = 0; j < k; j++) {
-            if (strcmp(top[j].tara, tc[i].tara) == 0) {
-                idx = j;
-                break;
-            }
-        }
-
-        if (idx == -1) {
-            strcpy(top[k].tara, tc[i].tara);
-            strcpy(top[k].oras, tc[i].oras);
-            top[k].venitMax = tc[i].venit;
-            k++;
-        } else if (tc[i].venit > top[idx].venitMax) {
-            strcpy(top[idx].oras, tc[i].oras);
-            top[idx].venitMax = tc[i].venit;
-        }
-    }
-
-    printf("\nOrasul cu cel mai mare venit pentru fiecare tara:\n");
-    for (int i = 0; i < k; i++) {
-        printf("%s -> %s : %.2f\n", top[i].tara, top[i].oras, top[i].venitMax);
-    }
-
-    free(tc);
-    free(top);
+    int temp = arr[i+1]; arr[i+1] = arr[high]; arr[high] = temp;
+    return i+1;
 }
 
-void tendinteSubcategorii(Vanzare v[], int n) {
-    printf("\nTendinte lunare pe subcategorii:\n");
-
-    for (int luna = 1; luna <= 12; luna++) {
-        printf("\nLuna %d:\n", luna);
-        for (int i = 0; i < n; i++)
-            if (v[i].luna == luna)
-                printf("%s: %.2f\n", v[i].subcategorie, v[i].venit);
+void quickSort(int* arr, int low, int high) {
+    if(low < high) {
+        int pi = partition(arr, low, high);
+        quickSort(arr, low, pi-1);
+        quickSort(arr, pi+1, high);
     }
+}
+
+void quickSortWrapper(int* arr, int n) {
+    clock_t start = clock();
+    quickSort(arr, 0, n-1);
+    clock_t end = clock();
+    printf("Quick Sort executat în %.5f secunde\n", (double)(end-start)/CLOCKS_PER_SEC);
+}
+
+// Linear Search
+void linearSearch(int* arr, int n, int key) {
+    clock_t start = clock();
+    for(int i = 0; i < n; i++) {
+        if(arr[i] == key) {
+            clock_t end = clock();
+            printf("Linear Search găsit la index %d în %.5f secunde\n", i, (double)(end-start)/CLOCKS_PER_SEC);
+            return;
+        }
+    }
+    clock_t end = clock();
+    printf("Linear Search nu a găsit elementul în %.5f secunde\n", (double)(end-start)/CLOCKS_PER_SEC);
+}
+
+// Binary Search (tablou trebuie sortat)
+int binarySearch(int* arr, int n, int key) {
+    clock_t start = clock();
+    int left = 0, right = n-1;
+    while(left <= right) {
+        int mid = left + (right-left)/2;
+        if(arr[mid] == key) {
+            clock_t end = clock();
+            printf("Binary Search găsit la index %d în %.5f secunde\n", mid, (double)(end-start)/CLOCKS_PER_SEC);
+            return mid;
+        }
+        if(arr[mid] < key) left = mid+1;
+        else right = mid-1;
+    }
+    clock_t end = clock();
+    printf("Binary Search nu a găsit elementul în %.5f secunde\n", (double)(end-start)/CLOCKS_PER_SEC);
+    return -1;
+}
+
+// Structură pentru numere mari (unsigned long long pentru simplitate)
+typedef unsigned long long ULL;
+
+void multiply(ULL F[2][2], ULL M[2][2]) {
+    ULL x = F[0][0]*M[0][0] + F[0][1]*M[1][0];
+    ULL y = F[0][0]*M[0][1] + F[0][1]*M[1][1];
+    ULL z = F[1][0]*M[0][0] + F[1][1]*M[1][0];
+    ULL w = F[1][0]*M[0][1] + F[1][1]*M[1][1];
+    F[0][0] = x; F[0][1] = y; F[1][0] = z; F[1][1] = w;
+}
+
+void power(ULL F[2][2], int n) {
+    if(n == 0 || n == 1) return;
+    ULL M[2][2] = {{1,1},{1,0}};
+    power(F, n/2);
+    multiply(F,F);
+    if(n%2 != 0) multiply(F,M);
+}
+
+ULL fib(int n) {
+    if(n == 0) return 0;
+    ULL F[2][2] = {{1,1},{1,0}};
+    power(F, n-1);
+    return F[0][0];
 }
 
 int main() {
-    Vanzare *v = malloc(sizeof(Vanzare) * (size_t)MAX);
-    int n = citesteCSV("C:/zyx/sales.csv", v, MAX);
+    srand(time(NULL));
+    int n = 10;
+    int* arr = NULL;
+    int choice, key;
 
-    venitPeLuni(v, n);
-    top5Produse(v, n);
-    vanzariPeCategorii(v, n);
-    topOrasePeTara(v, n);
-    tendinteSubcategorii(v, n);
-    free(v);
+    do {
+        printf("\n--- MENIU ---\n");
+        printf("1. Initializare tablou\n");
+        printf("2. Afisare tablou\n");
+        printf("3. Eliberare memorie\n");
+        printf("4. Sortare Bubble Sort\n");
+        printf("5. Sortare Quick Sort\n");
+        printf("6. Cautare Linear Search\n");
+        printf("7. Cautare Binary Search\n");
+        printf("8. Fibonacci\n");
+        printf("0. Iesire\n");
+        printf("Alege: ");
+        scanf("%d", &choice);
+
+        switch(choice) {
+            case 1:
+                printf("Dimensiune tablou: "); scanf("%d",&n);
+                arr = initArray(n);
+                break;
+            case 2:
+                if(arr) printArray(arr,n);
+                else printf("Tablou neinitializat!\n");
+                break;
+            case 3:
+                if(arr) { freeArray(arr); arr=NULL; }
+                break;
+            case 4:
+                if(arr) bubbleSort(arr,n);
+                break;
+            case 5:
+                if(arr) quickSortWrapper(arr,n);
+                break;
+            case 6:
+                if(arr) { printf("Numar de cautat: "); scanf("%d",&key); linearSearch(arr,n,key); }
+                break;
+            case 7:
+                if(arr) { printf("Numar de cautat: "); scanf("%d",&key); quickSortWrapper(arr,n); binarySearch(arr,n,key); }
+                break;
+            case 8:
+                printf("Pozitia N: "); scanf("%d",&key);
+                clock_t start = clock();
+                ULL result = fib(key);
+                clock_t end = clock();
+                printf("Fib(%d) = %llu calculat în %.5f secunde\n", key, result, (double)(end-start)/CLOCKS_PER_SEC);
+                break;
+        }
+    } while(choice != 0);
+
     return 0;
 }
