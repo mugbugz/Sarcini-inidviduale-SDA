@@ -1,187 +1,185 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
-#include <stdint.h>
+#include <string.h>
 
-// Inițializare tablou cu valori aleatorii
-int* initArray(int n) {
-    int* arr = (int*)malloc(n * sizeof(int));
-    for(int i = 0; i < n; i++) {
-        arr[i] = rand() % 1000;
+typedef struct Document {
+    int id;
+    char name[50];
+    int totalRows;
+    int remainingRows;
+    struct Document* next;
+} Document;
+
+typedef struct Printer {
+    int id;
+    int timePerRow;
+    Document* currentDoc;
+    struct Printer* next;
+} Printer;
+
+Document* queueHead = NULL;
+Printer* printersHead = NULL;
+
+// Adaugă document în coadă
+void addDocument(int id, const char* name, int rows) {
+    Document* newDoc = (Document*)malloc(sizeof(Document));
+    newDoc->id = id;
+    strcpy(newDoc->name, name);
+    newDoc->totalRows = rows;
+    newDoc->remainingRows = rows;
+    newDoc->next = NULL;
+
+    if (!queueHead) {
+        queueHead = newDoc;
+    } else {
+        Document* temp = queueHead;
+        while (temp->next) temp = temp->next;
+        temp->next = newDoc;
     }
-    return arr;
 }
 
-// Afișare tablou
-void printArray(int* arr, int n) {
-    for(int i = 0; i < n; i++) {
-        printf("%d ", arr[i]);
+// Inițializează imprimantele
+void initPrinters(int n, int times[]) {
+    for (int i = 0; i < n; i++) {
+        Printer* newPrinter = (Printer*)malloc(sizeof(Printer));
+        newPrinter->id = i + 1;
+        newPrinter->timePerRow = times[i];
+        newPrinter->currentDoc = NULL;
+        newPrinter->next = printersHead;
+        printersHead = newPrinter;
     }
-    printf("\n");
+}
+
+// Distribuie documentele către imprimante libere
+void distributeDocuments() {
+    Printer* p = printersHead;
+    while (p) {
+        if (!p->currentDoc && queueHead) {
+            p->currentDoc = queueHead;
+            queueHead = queueHead->next;
+            p->currentDoc->next = NULL;
+            printf("Document %s atribuit imprimantei %d\n", p->currentDoc->name, p->id);
+        }
+        p = p->next;
+    }
+}
+
+// Simulează tipărirea
+void simulateStep() {
+    Printer* p = printersHead;
+    while (p) {
+        if (p->currentDoc) {
+            p->currentDoc->remainingRows--;
+            printf("Imprimanta %d tipareste documentul %s, randuri ramase: %d\n",
+                   p->id, p->currentDoc->name, p->currentDoc->remainingRows);
+
+            if (p->currentDoc->remainingRows <= 0) {
+                printf("Document %s finalizat de imprimanta %d\n", p->currentDoc->name, p->id);
+                free(p->currentDoc);
+                p->currentDoc = NULL;
+            }
+        }
+        p = p->next;
+    }
+    distributeDocuments();
+}
+
+// Anulează document din coadă
+void cancelDocument(int id) {
+    Document* prev = NULL;
+    Document* curr = queueHead;
+    while (curr) {
+        if (curr->id == id) {
+            if (prev) prev->next = curr->next;
+            else queueHead = curr->next;
+            free(curr);
+            printf("Document %d anulat din coada.\n", id);
+            return;
+        }
+        prev = curr;
+        curr = curr->next;
+    }
+    // verifică imprimantele
+    Printer* p = printersHead;
+    while (p) {
+        if (p->currentDoc && p->currentDoc->id == id) {
+            free(p->currentDoc);
+            p->currentDoc = NULL;
+            printf("Document %d anulat în curs de tiparire.\n", id);
+            return;
+        }
+        p = p->next;
+    }
+    printf("Document %d nu a fost gasit.\n", id);
+}
+
+// Adaugă imprimantă
+void addPrinter(int id, int timePerRow) {
+    Printer* newPrinter = (Printer*)malloc(sizeof(Printer));
+    newPrinter->id = id;
+    newPrinter->timePerRow = timePerRow;
+    newPrinter->currentDoc = NULL;
+    newPrinter->next = printersHead;
+    printersHead = newPrinter;
+    printf("Imprimanta %d adaugata.\n", id);
+}
+
+// Scoate imprimantă
+void removePrinter(int id) {
+    Printer* prev = NULL;
+    Printer* curr = printersHead;
+    while (curr) {
+        if (curr->id == id) {
+            if (prev) prev->next = curr->next;
+            else printersHead = curr->next;
+            if (curr->currentDoc) {
+                addDocument(curr->currentDoc->id, curr->currentDoc->name, curr->currentDoc->remainingRows);
+                free(curr->currentDoc);
+            }
+            free(curr);
+            printf("Imprimanta %d scoasa din functiune.\n", id);
+            return;
+        }
+        prev = curr;
+        curr = curr->next;
+    }
+    printf("Imprimanta %d nu a fost gasita.\n", id);
 }
 
 // Eliberare memorie
-void freeArray(int* arr) {
-    free(arr);
-}
-
-// Bubble Sort
-void bubbleSort(int* arr, int n) {
-    clock_t start = clock();
-    for(int i = 0; i < n-1; i++) {
-        for(int j = 0; j < n-i-1; j++) {
-            if(arr[j] > arr[j+1]) {
-                int temp = arr[j];
-                arr[j] = arr[j+1];
-                arr[j+1] = temp;
-            }
-        }
+void freeAll() {
+    while (queueHead) {
+        Document* temp = queueHead;
+        queueHead = queueHead->next;
+        free(temp);
     }
-    clock_t end = clock();
-    printf("Bubble Sort executat în %.5f secunde\n", (double)(end-start)/CLOCKS_PER_SEC);
-}
-
-// Quick Sort
-int partition(int* arr, int low, int high) {
-    int pivot = arr[high];
-    int i = low - 1;
-    for(int j = low; j < high; j++) {
-        if(arr[j] < pivot) {
-            i++;
-            int temp = arr[i]; arr[i] = arr[j]; arr[j] = temp;
-        }
+    while (printersHead) {
+        Printer* temp = printersHead;
+        printersHead = printersHead->next;
+        if (temp->currentDoc) free(temp->currentDoc);
+        free(temp);
     }
-    int temp = arr[i+1]; arr[i+1] = arr[high]; arr[high] = temp;
-    return i+1;
-}
-
-void quickSort(int* arr, int low, int high) {
-    if(low < high) {
-        int pi = partition(arr, low, high);
-        quickSort(arr, low, pi-1);
-        quickSort(arr, pi+1, high);
-    }
-}
-
-void quickSortWrapper(int* arr, int n) {
-    clock_t start = clock();
-    quickSort(arr, 0, n-1);
-    clock_t end = clock();
-    printf("Quick Sort executat în %.5f secunde\n", (double)(end-start)/CLOCKS_PER_SEC);
-}
-
-// Linear Search
-void linearSearch(int* arr, int n, int key) {
-    clock_t start = clock();
-    for(int i = 0; i < n; i++) {
-        if(arr[i] == key) {
-            clock_t end = clock();
-            printf("Linear Search găsit la index %d în %.5f secunde\n", i, (double)(end-start)/CLOCKS_PER_SEC);
-            return;
-        }
-    }
-    clock_t end = clock();
-    printf("Linear Search nu a găsit elementul în %.5f secunde\n", (double)(end-start)/CLOCKS_PER_SEC);
-}
-
-// Binary Search (tablou trebuie sortat)
-int binarySearch(int* arr, int n, int key) {
-    clock_t start = clock();
-    int left = 0, right = n-1;
-    while(left <= right) {
-        int mid = left + (right-left)/2;
-        if(arr[mid] == key) {
-            clock_t end = clock();
-            printf("Binary Search găsit la index %d în %.5f secunde\n", mid, (double)(end-start)/CLOCKS_PER_SEC);
-            return mid;
-        }
-        if(arr[mid] < key) left = mid+1;
-        else right = mid-1;
-    }
-    clock_t end = clock();
-    printf("Binary Search nu a găsit elementul în %.5f secunde\n", (double)(end-start)/CLOCKS_PER_SEC);
-    return -1;
-}
-
-// Structură pentru numere mari (unsigned long long pentru simplitate)
-typedef unsigned long long ULL;
-
-void multiply(ULL F[2][2], ULL M[2][2]) {
-    ULL x = F[0][0]*M[0][0] + F[0][1]*M[1][0];
-    ULL y = F[0][0]*M[0][1] + F[0][1]*M[1][1];
-    ULL z = F[1][0]*M[0][0] + F[1][1]*M[1][0];
-    ULL w = F[1][0]*M[0][1] + F[1][1]*M[1][1];
-    F[0][0] = x; F[0][1] = y; F[1][0] = z; F[1][1] = w;
-}
-
-void power(ULL F[2][2], int n) {
-    if(n == 0 || n == 1) return;
-    ULL M[2][2] = {{1,1},{1,0}};
-    power(F, n/2);
-    multiply(F,F);
-    if(n%2 != 0) multiply(F,M);
-}
-
-ULL fib(int n) {
-    if(n == 0) return 0;
-    ULL F[2][2] = {{1,1},{1,0}};
-    power(F, n-1);
-    return F[0][0];
 }
 
 int main() {
-    srand(time(NULL));
-    int n = 10;
-    int* arr = NULL;
-    int choice, key;
+    int times[] = {2, 3}; // timpi de tipărire pentru 2 imprimante
+    initPrinters(2, times);
 
-    do {
-        printf("\n--- MENIU ---\n");
-        printf("1. Initializare tablou\n");
-        printf("2. Afisare tablou\n");
-        printf("3. Eliberare memorie\n");
-        printf("4. Sortare Bubble Sort\n");
-        printf("5. Sortare Quick Sort\n");
-        printf("6. Cautare Linear Search\n");
-        printf("7. Cautare Binary Search\n");
-        printf("8. Fibonacci\n");
-        printf("0. Iesire\n");
-        printf("Alege: ");
-        scanf("%d", &choice);
+    addDocument(1, "Raport", 5);
+    addDocument(2, "Contract", 3);
+    addDocument(3, "Manual", 4);
 
-        switch(choice) {
-            case 1:
-                printf("Dimensiune tablou: "); scanf("%d",&n);
-                arr = initArray(n);
-                break;
-            case 2:
-                if(arr) printArray(arr,n);
-                else printf("Tablou neinitializat!\n");
-                break;
-            case 3:
-                if(arr) { freeArray(arr); arr=NULL; }
-                break;
-            case 4:
-                if(arr) bubbleSort(arr,n);
-                break;
-            case 5:
-                if(arr) quickSortWrapper(arr,n);
-                break;
-            case 6:
-                if(arr) { printf("Numar de cautat: "); scanf("%d",&key); linearSearch(arr,n,key); }
-                break;
-            case 7:
-                if(arr) { printf("Numar de cautat: "); scanf("%d",&key); quickSortWrapper(arr,n); binarySearch(arr,n,key); }
-                break;
-            case 8:
-                printf("Pozitia N: "); scanf("%d",&key);
-                clock_t start = clock();
-                ULL result = fib(key);
-                clock_t end = clock();
-                printf("Fib(%d) = %llu calculat în %.5f secunde\n", key, result, (double)(end-start)/CLOCKS_PER_SEC);
-                break;
-        }
-    } while(choice != 0);
+    distributeDocuments();
 
+    for (int i = 0; i < 10; i++) {
+        printf("\n--- Pas %d ---\n", i + 1);
+        simulateStep();
+    }
+
+    cancelDocument(2);
+    addPrinter(3, 1);
+    removePrinter(1);
+
+    freeAll();
     return 0;
 }
